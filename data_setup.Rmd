@@ -1,0 +1,467 @@
+---
+title: "Data on US Federal Balance of Payments, 2018"
+author: "Joseph Nathan Cohen"
+date: "12/9/2020"
+output: 
+  html_document:
+    toc: true
+  
+---
+
+```{r setup, include=FALSE}
+
+# Clear Memory
+rm(list=ls())
+gc()
+
+# Set Working Directory
+directory <- "E:/Dropbox/Research/State Balance of Payments"
+data.directory <- paste0(directory, "/Data")
+setwd(directory)
+
+# Set Random Seed
+set.seed(123)
+
+# Turn off Scientific Notation
+options(scipen=999)
+
+# Load R packages used in this analysis
+library(dplyr)
+library(readxl)
+library(openxlsx)
+library(kableExtra)
+library(formattable)
+library(scales)
+library(maps)
+library(data.table)
+library(ggsn) 
+library(ggrepel)
+library(usmap)
+library(ggplot2)
+library(lmtest)
+library(sandwich)
+library(stargazer)
+library(psycho)
+library(ggmap)
+library(maps)
+library(mapdata)
+library(tidyr)
+library(dplyr)
+
+```
+
+The *US Federal Balance of Payments* data set is a compilation of state-level public finance, demographic, geographic, and other data, covering the year 2018.  This document outlines the variables contained in this set, and the sources from which they were drawn. 
+
+Download the data set in comma-separated values format here.
+
+The scripts and raw data used to consolidate this data are available for download on this project's archive on the [Open Science Framework](https://osf.io/8cqtg/)^[Cohen, Joseph N. 2020. “State Balance of Payment Data, 2018.” Retrieved <osf.io/eh2d9>.]
+
+# Data & Sources
+
+This section describes the data set and the sources used to build it.
+
+## Federal Balance-of-Payment Data
+
+The set is centered on a state-disaggregated federal revenue and expenditure set maintained by the [New York Comptroller's Office](https://www.osc.state.ny.us/files/reports/budget/pdf/federal-budget-fiscal-year-2018.pdf).^[New York State Comptroller’s Office (2020) New York's Balance of Payments in the Federal Budget, January <https://www.osc.state.ny.us/files/reports/budget/pdf/federal-budget-fiscal-year-2018.pdf>.] Its associated variables are described in the table below:
+
+```{r NY state data, include = F}
+# NYS Balance of Payment Data
+# Data is distributed in Excel workbook spread across multiple sheets
+# Below, I tidy them into a unified data table
+setwd(data.directory)
+
+temp.1 <- read_xlsx("NYS Federal Payments Data.xlsx", sheet = 2, skip = 2)
+names(temp.1) <- paste(c("state", "bop.total", "bop.pc", "DROP"))
+temp.1 <- temp.1[,c(1:3)]
+
+temp.2 <- read_xlsx("NYS Federal Payments Data.xlsx", sheet = 4, skip = 2)
+names(temp.2) <- paste(c("state", "tax.paid.total", "tax.paid.pc", "DROP"))
+temp.2 <- temp.2[,c(1:3)]
+
+temp.3 <- merge(temp.1, temp.2, by = "state")
+
+temp.4 <- read_xlsx("NYS Federal Payments Data.xlsx", sheet = 5, skip = 3)
+names(temp.4) <- paste(c("state", "tax.paid.pinc", "tax.paid.pinc.pc", "DROP", "DROP",
+                         "tax.paid.socins", "tax.paid.socins.pc", "DROP","DROP",
+                         "tax.paid.corp", "tax.paid.corp.pc", "DROP","DROP",
+                         "tax.paid.excise", "tax.paid.excise.pc", "DROP","DROP",
+                         "tax.paid.estate", "tax.paid.estate.pc", "DROP"))
+temp.4 <- temp.4[,c(1:3,6,7,10,11,14,15,18,19)]
+
+temp.5 <- merge(temp.3, temp.4, by = "state")
+
+temp.6 <- read_xlsx("NYS Federal Payments Data.xlsx", sheet = 6, skip = 2)
+names(temp.6) <- paste(c("state", "exp.total", "exp.pc", "DROP"))
+temp.6 <- temp.6[,c(1:3)]
+
+temp.7 <- merge(temp.5, temp.6, by = "state")
+
+temp.8 <- read_xlsx("NYS Federal Payments Data.xlsx", sheet = 7, skip = 2)
+names(temp.8) <- paste(c("state", "exp.dirpmt.total", "exp.dirpmt.pc", "DROP"))
+temp.8 <- temp.8[,c(1:3)]
+
+temp.9 <- merge(temp.7, temp.8, by = "state")
+
+temp.10 <- read_xlsx("NYS Federal Payments Data.xlsx", sheet = 8, skip = 3)
+names(temp.10) <- paste(c("state", "exp.dirpmt.socsec.tot", "exp.dirpmt.socsec.pc", "DROP", "DROP",
+                          "exp.dirpmt.medicare.tot", "exp.dirpmt.medicare.pc", "DROP", "DROP",
+                          "exp.dirpmt.vetben.tot", "exp.dirpmt.vetben.pc", "DROP", "DROP",
+                          "exp.dirpmt.fedempl.tot", "exp.dirpmt.fedempl.pc", "DROP", "DROP",
+                          "exp.dirpmt.snap.tot", "exp.dirpmt.snap.pc", "DROP", "DROP",
+                          "exp.dirpmt.eitc.tot", "exp.dirpmt.eitc.pc", "DROP", "DROP",
+                          "exp.dirpmt.ssi.tot", "exp.dirpmt.ssi.pc", "DROP"))
+temp.11 <- temp.10[,c(1:3,6,7,10,11,14,15,18,19,22,23,26,27)]
+temp.12 <- merge(temp.9, temp.11, by = "state")
+
+temp.13 <- read_xlsx("NYS Federal Payments Data.xlsx", sheet = 9, skip = 2)
+names(temp.13) <- paste(c("state", "exp.grants.total", "exp.grants.pc", "DROP"))
+temp.13 <- temp.13[,c(1:3)]
+temp.14 <- merge(temp.12, temp.13, by = "state")
+
+temp.15 <- read_xlsx("NYS Federal Payments Data.xlsx", sheet = 10, skip = 3)
+names(temp.15) <- paste(c("state", "exp.grants.medicaid.tot", "exp.grants.medicaid.pc", "DROP", "DROP",
+                          "exp.grants.hiways.tot", "exp.grants.hiways.pc", "DROP", "DROP",
+                          "exp.grants.housing.tot", "exp.grants.housing.pc", "DROP", "DROP",
+                          "exp.grants.chldnut.tot", "exp.grants.chldnut.pc", "DROP", "DROP",
+                          "exp.grants.tanf.tot", "exp.grants.tanf.pc", "DROP", "DROP",
+                          "exp.grants.esea.tot", "exp.grants.esea.pc", "DROP", "DROP",
+                          "exp.grants.sped.tot", "exp.grants.sped.pc", "DROP", "DROP",
+                          "exp.grants.chip.tot", "exp.grants.chip.pc", "DROP", "DROP",
+                          "exp.grants.transit.tot", "exp.grants.transit.pc", "DROP"))
+temp.15 <- temp.15[,c(1:3,6,7,10,11,14,15,18,19,22,23,26,27,30,31,34,35)]
+temp.16 <- merge(temp.14, temp.15, by = "state")
+
+temp.17 <- read_xlsx("NYS Federal Payments Data.xlsx", sheet = 11, skip = 2)
+names(temp.17) <- paste(c("state", "exp.proc.total", "exp.proc.pc", "DROP"))
+temp.17 <- temp.17[,c(1:3)]
+temp.18 <- merge(temp.16, temp.17, by = "state")
+
+temp.19 <- read_xlsx("NYS Federal Payments Data.xlsx", sheet = 12, skip = 3)
+names(temp.19) <- paste(c("state", "exp.proc.mil.tot", "exp.proc.mil.pc", "DROP", "DROP",
+                          "exp.proc.nonmil.tot", "exp.proc.nonmil.pc", "DROP"))
+temp.19 <- temp.19[,c(1:3,6,7)]
+temp.20 <- merge(temp.18, temp.19, by = "state")
+
+temp.21 <- read_xlsx("NYS Federal Payments Data.xlsx", sheet = 13, skip = 2)
+names(temp.21) <- paste(c("state", "exp.wages.total", "exp.wages.pc", "DROP"))
+temp.21 <- temp.21[,c(1:3)]
+temp.22 <- merge(temp.20, temp.21, by = "state")
+
+temp.23 <- read_xlsx("NYS Federal Payments Data.xlsx", sheet = 14, skip = 3)
+names(temp.23) <- paste(c("state", "exp.wages.mil.tot", "exp.wages.mil.pc", "DROP", "DROP",
+                          "exp.wages.civ.tot", "exp.wages.civ.pc", "DROP"))
+temp.23 <- temp.23[,c(1:3,6,7)]
+temp.24 <- merge(temp.22, temp.23, by = "state")
+
+temp.25 <- read_xlsx("NYS Federal Payments Data.xlsx", sheet = 15, skip = 2)
+temp.25 <- temp.25[,c(1,3)]
+names(temp.25) <- paste(c("state", "population"))
+temp.26 <- merge(temp.24, temp.25, by = "state")
+
+bop.data <- temp.26
+rm(list=ls(pattern="temp"))
+
+var.descr <- c(
+  "State's federal balance-of-payments",
+  "Per capita balance-of-payments",
+  "Taxes paid, total",
+  "Taxes paid, per capita",
+  "Taxes paid: Personal, total",
+  "Taxes paid: Personal, per capita",
+  "Taxes paid: Social Insurance, per capita",
+  "Taxes paid: Social Insurance, total",
+  "Taxes paid: Corporate, total",
+  "Taxes paid, Corporate, per capita",
+  "Taxes paid: Excise, total",
+  "Taxes paid, Excise, per capita",
+  "Taxes paid, Estate, total",
+  "Taxes paid: Estate, per capita",
+  "Expenditures, total",
+  "Expenditures, per capita",
+  "Expenditures: Direct payments, total",
+  "Expenditures: Direct payments, per capita",
+  "Expenditures: Direct payments: Social Security, total",
+  "Expenditures: Direct payments: Social Security, per capita",
+  "Expenditures: Direct payments: Medicare, total",
+  "Expenditures: Direct payments: Medicare, per capita",
+  "Expenditures: Direct payments: Veterans' Benefits, total",
+  "Expenditures: Direct payments: veterans' benefits, per capita",
+  "Expenditures: Direct payments: federal employment, total",
+  "Expenditures: Direct payments: federal employment, per capita",
+  "Expenditures: Direct payments: SNAP, total",
+  "Expenditures: Direct payments: SNAP, per capita",
+  "Expenditures: Direct payments: EITC, total",
+  "Expenditures: Direct payments: EITC, per capita",
+  "Expenditures: Direct payments: SSI, total",
+  "Expenditures: Direct payments: SSIR, per capita",
+  "Expenditures: Grants, total",
+  "Expenditures: Grants, per capita", 
+  "Expenditures: Grants: Medicaid, total",
+  "Expenditures: Grants: Medicaid, per capita",
+  "Expenditures: Grants: Highways, total",
+  "Expenditures: Grants: Highways, per capita", 
+  "Expenditures: Grants: Housing, total",
+  "Expenditures: Grants: Housing, per capita", 
+  "Expenditures: Grants: Child Nutrition, total",
+  "Expenditures: Grants: Child Nutrition, per capita", 
+  "Expenditures: Grants: TANF, total",
+  "Expenditures: Grants: TANF, per capita", 
+  "Expenditures: Grants: ESEA, total",
+  "Expenditures: Grants: ESEA, per capita", 
+  "Expenditures: Grants: Special Ed, total",
+  "Expenditures: Grants, Special Ed, per capita", 
+  "Expenditures: Grants: CHIP, total",
+  "Expenditures: Grants: CHIP, per capita", 
+  "Expenditures: Grants: Transit, total",
+  "Expenditures: Grants: Transit, per capita", 
+  "Expenditures: Procurement, total",
+  "Expenditures: Procurement, per capita", 
+  "Expenditures: Procurement: Military, total",
+  "Expenditures: Procurement: Military, per capita",
+  "Expenditures: Procurement: Non-Military, total",
+  "Expenditures: Procurement: non-military, per capita",
+  "Expenditures: Wages, Total",
+  "Expenditures: Wages, per capita",
+  "Expenditures: Wages: military, total",
+  "Expenditures; Wages: military, per capita",
+  "Expenditures: Wages, civilian, total",
+  "Expenditures: Wages, civilian, per capita")
+
+Names <- names(bop.data)[-c(1,66)]
+tab.bop.dat <- 
+  cbind(Names,var.descr)
+names(tab.bop.dat) <- paste(c("Variable", "Explanation"))
+  
+rm(Names, var.descr)
+  
+```
+
+```{r NY state BOP data variables, include = T, echo = F, results = "asis"}
+
+kable(tab.bop.dat, booktabs = T, longtable = T, caption = "Federal Transfers Variables") %>%
+  kable_styling()
+
+```
+
+## State Population & Density Data
+
+We use a Census distribution for state-level population, population growth, and density data.^[U.S. Census Bureau “Table 14. State Population - Rank, Percent Change, and Population Density” Data set downloaded November 1, 2020 from https://www2.census.gov/library/publications/2011/compendia/statab/131ed/tables/12s0014.xls>]  To examine the role that large city populations, we used Census data to score the percentage of a state's population residing in a Combined Statistical Area with at least 2 million people.  These variables are all described below:
+
+```{r Census population and density data set up, include = F}
+
+setwd(data.directory)
+
+census.pop <- read_xls("Census Pop and Density.xls", skip = 4)
+census.pop <- census.pop[-c(1:2),c(1,18,24)]
+names(census.pop) <- paste(c("state", "pop.growth", "pop.density"))
+bop.data <- merge(bop.data, census.pop, by = "state")
+
+```
+
+```{r setup megacity population data, include = F}
+setwd(data.directory)
+
+temp.1 <- read.csv("Census CSA Data.csv")
+
+temp.2 <- subset(temp.1, LSAD == "Combined Statistical Area" & 
+                   CENSUS2010POP > 2000000)[c(1,2,5,7)]
+tab.csa.pops <- arrange(temp.2[c(3,4)], -temp.2[4])
+
+
+temp.csa <- temp.2$CSA
+temp.3 <- subset(temp.1, LSAD != "Combined Statistical")
+
+for (i in temp.csa){
+  temp.A <- subset(temp.3, CSA == i)
+  temp.cbsas <- unique(temp.A$CBSA)
+  temp.B <- subset(temp.1, LSAD == "County or equivalent" & CBSA %in% temp.cbsas)[c(5,7)]
+  temp.vec <- as.character(temp.B$NAME)
+  temp.C <- unlist(strsplit(temp.vec, ", "))
+  temp.B$COUNTY <- temp.C[seq(1, length(temp.C), 2)]
+  temp.B$STATE <- temp.C[seq(2, length(temp.C), 2)]
+  temp.vecB <- unique(temp.B$STATE)
+  for (j in temp.vecB){
+    temp.C <- subset(temp.B, STATE == j)
+    assign(paste0("temD.",i,".",j), sum(temp.C$CENSUS2010POP))
+  }
+}
+
+rm(list=ls(pattern="temp"))
+
+for (i in state.abb){
+  temp.1 <- grep(i,names(.GlobalEnv),value=TRUE)
+  temp.dat <- 0
+  
+  
+  for (j in 1:length(temp.1)){
+    temp.dat <- ifelse(is.na(temp.1[j]), temp.dat, temp.dat + get(temp.1[j]))
+  }
+  assign(paste0("temp.", i), temp.dat)
+}
+
+for (i in state.abb){
+  temp <- get(paste0("temp.", i))
+  temp <- ifelse(is.logical(temp), 0, temp)
+  assign(paste0("temp.", i), temp)
+}
+
+temp <- mget(paste0("temp.", state.abb)) 
+
+temp.data <- data.frame(state.abb = state.abb, 
+                        state = state.name,
+                        metro.pop = array(as.numeric(unlist(temp)), dim=c(50,1)))
+
+bop.data <- merge(bop.data, temp.data, by = 'state')
+bop.data$metro.pop.pct <- (bop.data$metro.pop / bop.data$population) * 100
+
+rm(list=ls(pattern = "temD"))
+
+# What % in donor state megacities in 2010?
+(22255491 + 17877006 + 9840929 + 8923942 + 7893376 + 3706278)/309300000
+
+```
+
+```{r variable table - census data, echo = F, results = "asis"}
+
+tab <- data.frame(
+  Variable = c("population", "pop.growth", "pop.density", "metro.pop", "metro.pop.pct"),
+  Explanation = c("Total population", "Population Growth (%)", "State Population Density", 
+    "Metropolitan Population", "Metro Population (%)"))
+
+kable(tab, booktabs = T, longtable = T, caption = "Federal Transfers Variables") %>%
+  kable_styling()
+
+rm(list=ls(pattern="tab"))
+
+```
+## State GDP Data
+
+State GDP data was drawn from the [Bureau of Economic Analysis](https://apps.bea.gov/itable/iTable.cfm?ReqID=70&step=1#reqid=70&step=1&isuri=1).^[United States Bureau of Economic Analysis (2020) “Regional Data: GDP and Personal Income” Online dataset. Accessed November 11, 2020.  <https://apps.bea.gov/itable/iTable.cfm?ReqID=70&step=1#reqid=70&step=1&isuri=1>]  The set includes data on overall GDP, and government value-added.  It also breaks down government value-added to federal civilian, state/local civilian, and military.
+
+```{r set up gdp data, include = F}
+setwd(data.directory)
+temp.1 <- read.csv("BEA State GDP & Govt VA.csv")
+temp.1 <- temp.1[-c(1:9),-c(1,3)]
+temp.gdp <- subset(temp.1, X.2 == "All industry total")[c(1,3)]
+names(temp.gdp) <- paste(c("state", "gdp"))
+temp.govVA <- subset(temp.1, X.2 == "  Government and government enterprises")[c(1,3)]
+names(temp.govVA) <- paste(c("state", "gov.va"))
+temp.govVA.fedciv <- subset(temp.1, X.2 == "    Federal civilian")[c(1,3)]
+names(temp.govVA.fedciv) <- paste(c("state", "gov.va.fedciv"))
+temp.govVA.mil <- subset(temp.1, X.2 == "    Military")[c(1,3)]
+names(temp.govVA.mil) <- paste(c("state", "gov.va.mil"))
+temp.govVA.sl <- subset(temp.1, X.2 == "    State and local")[c(1,3)]
+names(temp.govVA.sl) <- paste(c("state", "gov.va.sl"))
+
+temp.2 <- merge(temp.gdp, temp.govVA, by = "state")
+temp.2 <- merge(temp.2, temp.govVA.fedciv, by = "state")
+temp.2 <- merge(temp.2, temp.govVA.mil, by = "state")
+temp.2 <- merge(temp.2, temp.govVA.sl, by = "state")
+
+bop.data <- merge(bop.data, temp.2, by = "state")
+
+bop.data$gdp.pc <- (bop.data$gdp * 1000) / bop.data$population
+bop.data$gdp.pc.K <- bop.data$gdp.pc / 1000
+  
+rm(list=ls(pattern="temp"))
+
+```
+
+```{r VA table, echo = F, include = T}
+
+tab <- data.frame(Variables = names(bop.data)[72:77],
+                  Description = c(
+                    "State GDP", "Total Government Value-Added", 
+                    "Govt Value;Added: Federal Civilian",
+                    "Govt Value-Added: Military",
+                    "Govt Value-Added: State & Local",
+                    "GDP per capita"
+                  ))
+
+kable(tab, booktabs = T, longtable = T, caption = "Economic Value-Added Variables") %>%
+  kable_styling()
+```
+
+## Census Area
+
+R's base package includes data on state's geographic size and the Census divisions to which states pertain.
+
+```{r census area data setup, include = F}
+
+temp.1 <- data.frame(state.abb, state.area, state.division, state.region)
+bop.data <- merge(bop.data, temp.1, by = "state.abb")
+
+```
+
+```{r state abb table, echo = F, include = T}
+
+tab <- data.frame(Variables = names(bop.data)[79:81],
+                  Description = c(
+                    "State area in mi^2",
+                    "Census-defined Division",
+                    "Census-defined Region"))
+
+kable(tab, booktabs = T, longtable = T, caption = "Area and Region Variables") %>%
+  kable_styling()
+
+```
+
+## Poverty
+
+The set includes two poverty metrics, drown from the [U.S Department of Agriculture's Economic Research Service](https://data.ers.usda.gov/reports.aspx?ID=17826)^[U.S. Department of Agriculture (2020) "Home / Data Products / County-level Data Sets / Poverty" Electronic data set downloaded December 9, 2020 from <https://data.ers.usda.gov/reports.aspx?ID=17826>]
+
+```{r poverty data setup, include = F}
+setwd(data.directory)
+temp.1 <- read.csv("USDA Poverty Estimates.csv")
+temp.1 <- temp.1[c(1,2,5)]
+names(temp.1) <- paste(c("state", "pov.pct", "pov.u18.pct"))
+bop.data <- merge(bop.data, temp.1, by = "state")
+
+```
+
+```{r table poverty, include = T, echo = F}
+tab <- data.frame(Variable = c("pov.pct", "pov.u18.pct"),
+                  Explanation = c("Poverty Rate", "Under-18 Poverty Rate"))
+kable(tab, booktabs = T, longtable = T, caption = "Poverty Variables") %>%
+  kable_styling()
+```
+
+## Local Prices
+
+Local price data is drawn from the [U.S. Bureau of Economic Analysis](https://apps.bea.gov/iTable/iTable.cfm?reqid=70&step=1&isuri=1&acrdn=8#reqid=70&step=1&isuri=1).^[U.S. Bureau of Economic Analysis (2020) "Regional Data: SARPP Regional Price Parities by State" Electronic data set downloaded December 9, 2020 from <https://apps.bea.gov/iTable/iTable.cfm?reqid=70&step=1&isuri=1&acrdn=8#reqid=70&step=1&isuri=1>]
+
+```{r regional prices data setup, include = F}
+setwd(data.directory)
+temp.1 <- read.csv("BEA COL Data.csv")
+temp.1 <- temp.1[2:3]
+names(temp.1) <- paste(c("state", "costliving"))
+bop.data <- merge(bop.data, temp.1, by = "state")
+
+```
+
+```{r table prices, include = T, echo = F}
+tab <- data.frame(Variable = c("pov.pct", "pov.u18.pct"),
+                  Explanation = c("Poverty Rate", "Under-18 Poverty Rate"))
+kable(data.frame(Variable = "costliving", Explanations = "State cost of living"), 
+      booktabs = T, longtable = T, caption = "Poverty Variables") %>%
+  kable_styling()
+```
+
+# Citing this Set
+
+Please cite this set as:
+
+Cohen, Joseph N. 2020. “State Balance of Payment Data, 2018.” Data set. <osf.io/eh2d9>
+
+```{r write data set to drive, include = F}
+
+# Last-Minute rescales
+bop.data$state.area <- bop.data$state.area / 1000
+
+#Writing data set
+setwd(directory)
+write.xlsx(bop.data, file = "US State Federal Payments 2018.xlsx")
+write.csv(bop.data, file = "US State Federal Payments 2018.csv")
+
+
+```
