@@ -1,0 +1,299 @@
+---
+title: "Where Do People Retire?"
+author: "Joseph Nathan Cohen"
+date: "12/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+rm(list=ls())
+gc()
+directory <- "E:/Dropbox/Research/State Balance of Payments"
+setwd(directory)
+
+library(curl)
+library(survey)
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(usmap)
+library(gridExtra)
+library(stringr)
+library(grid)
+
+states <- tolower(state.abb)
+
+```
+
+This analysis examines the distribution of elderly Americans by state.  It is motivated by a broader analysis on [federal redistribution by states through fiscal policy](http://www.josephnathancohen.info/research/federal-redistribution/), and questions about the degree to which differences in federal direct payments are strongly influenced by the prevalence of older people who are eligible for Social Security and Medicare.
+
+## Data
+
+This analysis uses data from the five-year sample of the 2018 [*American Community Survey*](https://www.census.gov/programs-surveys/acs).  [This post](http://www.josephnathancohen.info/data/quick-tutorial-american-community-survey/) offers a quick primer on how to access and analyze the set.  Additional tips on analyzing the data can be found in this Markdown file, which you can view on Git.  You can download a table of migrant population data here.  If you use the set in your own analysis, please cite this post.
+
+```{r data set up, eval = F, include = F}
+
+
+dat.dir <- "E:/Dropbox/Research/ACS/2018/5-Year"
+
+for (i in states){
+  setwd(dat.dir)
+  temp.dat <- readRDS(paste0(dat.dir, "/acs2018_5yp_", i, ".RDS"))
+  setwd(directory)
+  design.temp <-
+    svrepdesign(
+        weight = ~PWGTP ,           
+        repweights = 'PWGTP[0-9]+' ,  
+        scale = 4 / 80 ,            
+        rscales = rep( 1 , 80 ) ,      
+        mse = TRUE ,
+        type = 'JK1' ,                 
+        data = temp.dat                  
+    )
+  design.temp <- update(design.temp,
+                        MIGSP.2 = ifelse(MIGSP > 56, 99, MIGSP),
+                        one = 1)
+  design.temp <- update(design.temp,
+                        state.ly = factor(MIGSP.2,
+                                          levels = c(1:2, 4:6, 8:13, 15:42,
+                                                     44:51, 53:56, 99),
+                                          labels = c(states[1:8], "dc", states[9:50], "other")),
+                        migrant = factor(!is.na(state.ly), label = c("Non-Migrant", "Migrant")))
+
+  tot.pop.temp <- svytotal(~ one, design.temp)
+  mig.pop.temp <- svyby(~one, ~migrant, design.temp, svytotal)
+  state.ly.temp <- svyby(~one, ~state.ly, design.temp, svytotal)
+  eld.design.temp <- subset(design.temp, AGEP > 65)
+  eld.pop.temp <- svytotal(~ one, eld.design.temp)
+  eld.mig.pop.temp <- svyby(~one, ~migrant, eld.design.temp, svytotal)
+  eld.state.ly.temp <- svyby(~one, ~state.ly, eld.design.temp, svytotal)
+  
+  row.data.temp <- c(tot.pop.temp[1], mig.pop.temp[2,2], state.ly.temp[,2],eld.pop.temp[1],
+                     eld.mig.pop.temp[2,2], eld.state.ly.temp[,2])
+  dim(row.data.temp) <- c(1,length(row.data.temp))
+  row.data.temp <- as.data.frame(row.data.temp)
+  names(row.data.temp) <- paste(c("tot.pop", "migr.pop", paste0("mig.",state.ly.temp[,1]),
+                    "tot.pop.elderly", "mig.pop.elderly", paste0("mig.eld.",eld.state.ly.temp[,1])))
+  row.data.temp$state <- i
+
+  assign(paste0("dat.row.",i), row.data.temp)
+  }
+
+#Start with Flordia, with full data frame
+
+dat <- get(paste0("dat.row.", states[9]))
+for (i in c(1:8, 10: length(states))){
+  temp <- merge(dat, get(paste0("dat.row.",states[i])), all = T)
+  assign("dat", temp)
+}
+
+temp.order <- names(dat.row.fl)
+dat <- dat[c(temp.order[109],temp.order[1:108])]
+
+rm(list=ls(pattern="temp"))
+rm(list=ls(pattern="dat.row"))
+rm(i)
+
+temp.recode <- function(x){
+  
+}
+dat[2:109] <- 
+  lapply(dat[2:109], function(x) ifelse(is.na(x),0,x))
+
+dat <- arrange(dat, state)
+
+setwd(directory)
+write.csv(dat, file = "State Migration 2018.csv")
+
+```
+
+```{r load data, include = F}
+dat <- read.csv("State Migration 2018.csv")
+```
+
+## Prevalence of Elderly People
+
+```{r, eval = T, include = F}
+dat$elderly.pct <- (dat$tot.pop.elderly/dat$tot.pop) * 100
+summary(dat$elderly.pct)
+tab.eld.pct <- arrange(dat[c(2,111)], -elderly.pct)
+```
+
+The mean state had an elderly to total population ratio of about 14% elderly, ranging from Alaska (9%) to 18% (Florida).  A full table of state scores is appended to this report.  These amount to considerable differences.  States like Florida, Maine, or West Virginia have double the elderly population of states like Utah or Alaska.  Figure 1 (below) presents a dotplot that visualizes these differences in elderly prevalence rates, along with a map depicting the data presented in the appended table.
+
+```{r tot eld viz, include = F}
+
+plot.dot.eldpct <- 
+  ggplot(dat, aes(x = elderly.pct)) + geom_dotplot(binwidth =.5) +
+    scale_x_continuous(breaks = seq(9, 19, 1)) + 
+    xlab("Age 65+ Population (% Total Population)") +
+    theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+map.eldpct <- 
+  plot_usmap(data = dat, 
+           values = "elderly.pct", color = "black") + 
+  scale_fill_continuous(low = "white", high = "blue", 
+                        name = "Percent Elderly", 
+                        label = scales::comma) + 
+  theme(legend.position = "right") 
+
+```
+
+```{r, echo = F}
+
+plot.dot.eldpct
+map.eldpct
+
+```
+
+These differences could conceivably be driven by fertility, mortality, or migration.  In other words, either people in states are having more babies (leading to a proportionally young population), living longer (leading to more living older people), or the old and young are disproportionately migrating in or out of states.
+
+## Inter-State Relocation by Elderly
+
+### Inward Migration
+
+We can approximate where the elderly are migrating through the ACS's question about where respondents lived one year ago.  The question can give us a sense of how many people have moved to a state recently.  We use the metric as a proxy for measuring states with large elderly populations that migrated for retirement.  Figure 2 (below) shows a histogram and map of inward elderly migrants in the past year, as measured by the ratio of people aged 65+ who migrated in the past year to the total population.  A full data table is appended.
+
+```{r inw eld migr viz, eval = T, include = F}
+temp <- dat[c(2,59:109)]
+for (i in states){
+  temp[temp$state==i,paste0("mig.eld.",i)] <- 0
+}
+temp$inmig.eld <- rowSums(temp[c(2:52)])
+temp <- temp[c(1,53)]
+dat <- merge(dat, temp, by="state")
+dat$inmig.eld.pct <- (dat$inmig.eld / dat$tot.pop) * 100
+
+tab.eld.mig <- arrange(dat[c(1,113)], -inmig.eld.pct)
+
+plot.dot.eldmig.in <- 
+  ggplot(dat, aes(x = inmig.eld.pct)) + geom_dotplot(binwidth = .02) +
+    scale_x_continuous(breaks = seq(0, .6, .05)) + 
+    xlab("Annual Elderly Immigrant Population (% Total Population)") +
+    theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+map.eldmig.in <- 
+  plot_usmap(data = dat, 
+           values = "inmig.eld.pct", color = "black") + 
+  scale_fill_continuous(low = "white", high = "blue", 
+                        name = "Elderly Inward Migrants", 
+                        label = scales::number_format(accuracy = 0.1)) + 
+  theme(legend.position = "right") 
+
+```
+
+```{r, eval = T, echo = F}
+
+plot.dot.eldmig.in
+map.eldmig.in
+
+```
+
+Note that these are fractions of percentage points relative to the total population.  So Arizona and Florida received an estimated 0.5% of their population in inward elderly migration annually, whereas New York only received 0.07%, Illinois 0.8%, California 0.8%, and Texas 0.1%.  
+
+At first glance, these might seem like very low numbers.  However, keep in mind that these are annual migration rates, and their effects compound.  In a state with 10 million people, Arizona's rate amounts to over 511,000 inward migrants over 10 years, as opposed to over 68,000 at New York's rate.  In fact, Arizona and California are estimated to have had roughly the same absolute number of annual inward migrants, despite the fact that the latter is a much larger state.
+
+```{r, include = F}
+10000000*1.005^10-10000000
+10000000*1.00068^10-10000000
+```
+
+### Outward Migration
+
+Figure 3 (below) describes the size of migration outflows of elderly people, relative to the size of the total population.  Remember that this is a ratio of elderly out-migration to the *total* population, not the elderly popluation.  As such, this metric is interested in general population loss as a a result of elderly emigration.  It is not a metric of proportionally how frequently seniors leave the state.  We will put aside that question for another post.
+
+```{r, eval = T, include = F}
+
+temp <- dat[c(1,59:110)]
+for (i in states){
+  temp[temp$state==i,paste0("mig.eld.",i)] <- 0
+}
+temp <- data.frame(outmig.eld = colSums(temp[c(2:52)]))
+temp$state <- rownames(temp)
+temp <- temp[2:1]
+rownames(temp) <- NULL
+temp$state <- str_remove(temp$state, "mig.eld.")
+dat <- merge(dat, temp, by="state")
+dat$outmig.eld.pct <- (dat$outmig.eld / dat$tot.pop) * 100
+
+tab.eld.mig.out <- arrange(dat[c(1,115)], -outmig.eld.pct)
+
+plot.dot.eldmig.out <- 
+  ggplot(dat, aes(x = outmig.eld.pct)) + geom_dotplot(binwidth = 0.02) +
+    scale_x_continuous(breaks = seq(0, .6, .05)) + 
+    xlab("Annual Elderly Emigrant Population (% Total Population)") +
+    theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+map.eldmig.out <- 
+  plot_usmap(data = dat, 
+           values = "outmig.eld.pct", color = "black") + 
+  scale_fill_continuous(low = "white", high = "red", 
+                        name = "Elderly Outward Migrants", 
+                        label = scales::number_format(accuracy = 0.1)) + 
+  theme(legend.position = "right") 
+```
+
+```{r, echo=F}
+plot.dot.eldmig.out
+map.eldmig.out
+```
+
+To get a sense of the magnitude of these differences, consider our hypothetical state with a population of 10 million people.  At Vermont's rate of elderly out-migration (0.42% of the total populatoin leaving annually), that state would lose about 431 thousand people over 10 years.  At Texas's rate, this loss is 87 thousand
+
+```{r, include = F}
+10000000*1.00423^10-10000000
+10000000*1.00087^10-10000000
+```
+
+My first impression of the data is that smaller Northern states have the highest rate of out-migration.  I postulate that small-town, cold communities are more likely to lose elderly residents where the following may post quality-of-life problems: like weather, local healthcare quality, availability of cultural and entertainment opportunities, quality of public transit, walkability, or desirable part-time work opportunities.
+
+After these states, the next largest out-migrations (relative to population) are Florida and Arizona.  This might be the "buyers' remorse" out-migrants, or it may be that people who spend their working lives in these states tend to leave the state after their work years.  These proportions might be elevated because these states have proportionally larger elderly populations, so their migration would have a more exaggerated impact relative to the total population, which is the denominator we are using here.
+
+Interestingly, states dominated by high-tax, high-cost, and dense urban areas -- like New York, New Jersey,  Massachusetts, or Illinois -- experience median population loss rates.  California is near the bottom of elderly out-migration flow size, along with mostly warm weather, low-cost, and low-income states Louisiana, Alabama, and Mississippi, where people may lack the weather incentive or means to emigrate.
+
+### Net Migration
+
+Where does this leave us in terms of balance of migratory flows?  The figures below describe *net elderly migration*, calculated as total inward elderly migration less outward migration, divided by total population.  The result renders a familiar finding -- that the Northeast is experiencing a net population loss among the elderly.    
+
+```{r net migr, include = F}
+
+dat$eld.netmig <- ((dat$inmig.eld - dat$outmig.eld)/dat$tot.pop) * 100
+
+tab.eld.netmig<- arrange(dat[c(1,116)], -eld.netmig)
+
+plot.dot.eldmig.out <- 
+  ggplot(dat, aes(x = eld.netmig)) + geom_dotplot(binwidth = 0.02) +
+    scale_x_continuous(breaks = seq(-.5, .5, .05)) + 
+    xlab("Annual Net Elderly Migration (% Total Population)") +
+    theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+map.eldmig.out <- 
+  plot_usmap(data = dat, 
+           values = "eld.netmig", color = "black") + 
+  scale_fill_continuous(low = "red", high = "green", 
+                        name = "Net Elderly Migration", 
+                        label = scales::number_format(accuracy = 0.1)) + 
+  theme(legend.position = "right") 
+
+```
+
+```{r, echo=F}
+plot.dot.eldmig.out
+map.eldmig.out
+```
+
+
+#### Are People Fleeing New York Due to Big City Problems and High Taxes?
+
+The Northeast's population loss is often described as a matter of people fleeing crumbling cities and high taxes. However, these states are experiencing average levels of out-migration among the elderly.  Moreover, New York's out-migration has been reported to be driven by upstate emigration, not emigration from the cities.  This would make sense, given that other parts of the small town North are experiencing similar losses.
+
+From this vantage point, the main issue seems to be low inward migration of the elderly.  If someone doesn't establish a foothold in these communities during their working years, they are unlikely to move here.  
