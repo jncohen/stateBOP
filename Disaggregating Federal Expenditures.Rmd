@@ -1,0 +1,194 @@
+---
+title: "Disaggregating Federal Expenditures by State"
+author: "Joseph Nathan Cohen"
+date: "12/17/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+gc()
+directory <- "E:/Dropbox/Research/State Balance of Payments/"
+setwd(directory)
+
+data <- read.csv("US State Federal Payments 2018.csv") 
+
+options(scipen=999)
+
+library(usmap)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(scales)
+library(kableExtra)
+library(sjPlot)
+library(sjmisc)
+library(sjlabelled)
+library(GGally)
+library(lmtest)
+library(usdm)
+library(car)
+library(stargazer)
+
+```
+
+In a [preview post](http://www.josephnathancohen.info/notes/federal-spending-poverty-and-population/), I examined differences in federal spending across states.  This post disaggregates this spending to develop a more detailed view of why different states receive different spending within the current federal compact.  I used [this data](http://www.josephnathancohen.info/data/data-on-us-federal-balance-of-payments-2018/) for the analysis.
+
+What drives these differences? On way to engage the question is by disaggregating these expenditures.  Federal accounting uses five major categories to classify federal spending: direct payments, grants, wages, and procurement.  *Direct payments* are unreciprocated government payments to households, like Social Security, Medicare, welfare payments, or retirement benefits for the military or federal government workers.  They occur when the government sends money to a household without getting something in return, like labor, supplies, or some other good or service.  *Grants* are transfers to state/local governments and private enterprises for the fulfillment of some federal government-defined prerogative, including but not limited to Medicare, federal housing aid, roads, public transit, and much else.  *Procurement* expenditures include payments for the federal government's acquisition of goods and services for both civilian and military purposes.  *Wages* are payments to federal workers, both civilian and military. Both occcur where the government sets up operations that require people and supplies.
+
+### Direct Payments
+
+Direct payments are government payments directly to households.  They are comprised mainly of Social Security payments, Medicare coverage (where the federal government covers household medical payments directly), and payments to former federal employees (including military).  Per capita direct payments were highest in Vermont (\$10,211 per capita), West Virginia (\$9,745), Maine (\$8,937), Florida (\$8,802), Alabama (\$8,588), and Mississippi (\$8,454).  These payments are about one-fifth lower in major donor states, like California (\$6,097), New York (\$7,068) New Jersey (\$7,055), or Massachusetts (\$7,191).  
+
+Figure 1 describes the distribution of these expenditures (on a per person basis) across states.  
+
+
+```{r, echo = F}
+
+tab.agg.exps <- arrange(data[c(3,5,19,21,37,57,63)],-exp.pc)
+tab.agg.exps[c(2:7)] <- round(tab.agg.exps[c(2:7)], 0)
+
+data.nocap <- data %>% 
+  filter(state.abb != "MD" & state.abb!="VA")
+
+plot.dirpmt <- 
+  plot_usmap(data = data, 
+           values = "exp.dirpmt.pc", color = "black") + 
+  scale_fill_continuous(low = "white", high = "blue", 
+                        name = "Direct Payments Per Capita", 
+                        label = scales::comma) + 
+  theme(legend.position = "right") +
+  labs(title = "Federal Direct Payments by State")
+
+plot.dirpmt
+```
+
+```{r, echo = F}
+
+data$socsecMedicare <- data$exp.dirpmt.medicare.pc + data$exp.dirpmt.socsec.pc
+data$employeebens <- data$exp.dirpmt.fedempl.pc+ data$exp.dirpmt.vetben.pc
+data.nocap <- subset(data, state.abb!="MD" & state.abb!="VA")
+
+plot.dirpmt.entitlements <- 
+  plot_usmap(data = data, 
+           values = "socsecMedicare", color = "black") + 
+  scale_fill_continuous(low = "white", high = "blue", 
+                        name = "Social Security & Medicare Per Capita", 
+                        label = scales::comma) + 
+  theme(legend.position = "right") +
+  labs(title = "Federal Entitlements by State")
+
+plot.dirpmt.empbens <- 
+  plot_usmap(data = data, 
+           values = "employeebens", color = "black") + 
+  scale_fill_continuous(low = "white", high = "blue", 
+                        name = "Employee Benefits Per Capita", 
+                        label = scales::comma) + 
+  theme(legend.position = "right") +
+  labs(title = "Federal Employee Benefits by State")
+
+
+```
+
+Direct payments are primarily comprised of Social Security and Medicare payments (collectively, "federal entitlements), and these state-level differences seem to be primarily driven by differences how much of these state populations are eligible for these program's benefits.  Federal redistribution between households is primarily focused on helping elderly households.  Even wealthy elderly Americans enjoy considerable redistributive transfers.  These differences in direct payments are likely to be substantially driven by [differences in the prevalence of elderly people in state populations.](http://www.josephnathancohen.info/notes/where-do-people-retire/)  States like Florida, Arizona, Maine, or Oregon appear to be drawing retirees, who are bringing their government checks with them.
+
+```{r, echo = F}
+plot.dirpmt.entitlements
+```
+
+Additionally, reports of [state populations using the Social Security program as a form of federally-funded welfare](https://apps.npr.org/unfit-for-work/) could also be at work here.  For example, approximately 9% of West Virginia's working age population was reported to be on Workers' Disability in 2011.  Arkansas, Alabama, Kentucky, Mississippi, and Maine all have more than 7% of their working age population eligible for disability aid, compared to a national average of 4.6% and a considerable number of states with less than 4% disability rates.  These disability rates have risen as welfare rolls have been cut.  
+
+In addition to these differences in entitlement disbursements, these differences in direct payments are also attributable to differences in benefits for current and former federal employees, including the military.  These expenditures are particularly high in the national capital region (Maryland and Virginia), but also across the South and Interior.  This is only one part of the unequal distribution of federal jobs that appears in the data, but on its own it amounts to can amount to \$1000 or more in per capita federal transfers.  For a state like New York, just this small slice of federal transfers related to employment would amount to more than a \$19 billion annual infusion into the New York State economy.  
+
+```{r, echo = F}
+plot.dirpmt.empbens
+```
+
+
+### Grants
+
+Grants are transfers to state and local governments, and non-governmental agencies, to fulfill some federally-defined perogative.  The bulk of this spending is on poor aid.  Most of this grant money is for Medicare, and a considerable amount of the remainder goes to [TANF](https://en.wikipedia.org/wiki/Temporary_Assistance_for_Needy_Families), [Section 8](https://en.wikipedia.org/wiki/Section_8_(housing)), the [ESEA](https://en.wikipedia.org/wiki/Elementary_and_Secondary_Education_Act), Special Education funding, and  [CHIP](https://en.wikipedia.org/wiki/Children%27s_Health_Insurance_Program).  Other grants fund infrastructure development, research, and a range of other purposes. In 2018, the federal government [funded 1,274 such grants](https://fas.org/sgp/crs/misc/R40638.pdf)^[Congressional Research Service (2019) "Federal Grants to State and Local Governments: A Historical Perspective on Contemporary Issues" Report. <https://fas.org/sgp/crs/misc/R40638.pdf>].
+
+```{r, echo = F}
+plot.grants <- 
+  plot_usmap(data = data, 
+           values = "exp.grants.pc", color = "black") + 
+  scale_fill_continuous(low = "white", high = "blue", 
+                        name = "Grants Per Capita", 
+                        label = scales::comma) + 
+  theme(legend.position = "right") +
+  labs(title = "Federal Grants by State")
+
+plot.grants
+```
+
+These are the federal programs that can be of particular benefit to wealthier states, as they fund the programs that underwrite the livelihood of the urban poor, upon whom problems like economic segregation, unaffordable housing, and other problems can weigh more heavily.  Such programs also help states with proportionally large poor populations.
+
+### Federal Operations
+
+Federal operations -- whether through the military or in civilian government -- can sustain community economies.  A federal military base, prison, or other federal enterprise provides the jobs that can help make communities economically viable.  To the extent that such jobs are located in communities for the purposes of providing jobs to poor communities, then it is a form of redistribution like any other.  It is the government taking money from one community and investing it in another for the purposes of underwriting the economic sustenance of the reicpient community.
+
+The figure below shows state differences in combined federal wages (payments to employees for current work) and procurement (payments for supplies, materials, and subcontracted services to sustain federal operations) for both civilian and military operations.  We exclude the national capital region states (DC, MD, and VA) because they are far higher than other states and as a result they distort our scale.
+
+```{r, echo = F}
+
+data$govops.pc <- data$exp.wages.pc + data$exp.proc.pc
+data$govops.pc <- data$exp.wages.pc + data$exp.proc.pc
+
+data.nocap <- data %>% 
+  filter(state.abb != "MD" & state.abb!="VA")
+
+plot.ops <- 
+  plot_usmap(data = data.nocap, 
+           values = "govops.pc", color = "black") + 
+  scale_fill_continuous(low = "white", high = "blue", 
+                        name = "Operations Per Capita", 
+                        label = scales::comma) + 
+  theme(legend.position = "right") +
+  labs(title = "Federal Operations by State")
+
+plot.ops
+
+```
+
+The federal government disproportionately hires and sources in the U.S. South and Interior, and appears to have sidelined states in the Midwest and Mid-Atlantic. States like Alabama and Mississippi receive roughly five times as much spending on jobs and procurement.
+
+```{r, echo = F}
+
+plot.ops.wages <- 
+  plot_usmap(data = data.nocap, 
+           values = "exp.wages.pc", color = "black") + 
+  scale_fill_continuous(low = "white", high = "blue", 
+                        name = "Wages Per Capita", 
+                        label = scales::comma) + 
+  theme(legend.position = "right") +
+  labs(title = "Federal Wages by State")
+
+plot.ops.wages
+
+```
+
+```{r, echo = F}
+
+plot.ops.proc <- 
+  plot_usmap(data = data.nocap, 
+           values = "exp.proc.pc", color = "black") + 
+  scale_fill_continuous(low = "white", high = "blue", 
+                        name = "Procurement Per Capita", 
+                        label = scales::comma) + 
+  theme(legend.position = "right") +
+  labs(title = "Federal Procurement by State")
+
+plot.ops.proc
+
+```
+
+These transfers are considerable, amounting to about as much as entitlements.  In effect, states who lead the charge against government redistribution primarily live off federal transfers, but those transfers are in the form of jobs that can be construed as "deserving" or a proper use of communal resources.  However, to the extent that America's defense requires that military bases be put in Mississippi or Missouri as opposed to upstate New York or Pennsylvania, then these expenditures are being directed towards underwriting some community's livelihood using money taken from another community.
+
+## Interpretations
+
+This exercise help clarified some finer details explaining how different expenditures contribute to the economic redistribution that occurs through federal government operations.  They also help clarify why the states of metropolitan New York experience large balance of payment losses through the federal government.  Our current compact is one that directs federal jobs to the U.S. South and Western Interior, and to states that can attract the elderly, the favored children of American socialism. 
+
+Many of the programs that benefit New York -- like poor aid or transportation development -- are ghettoized in the federal grants system, where they are routinely subject to cutback pressures by the representatives of states who benefit from non-grants redistribution.
+
+
