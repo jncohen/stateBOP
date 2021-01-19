@@ -1,0 +1,160 @@
+---
+title: "Wealth, Propserity, Freedom, and the Size of the Public Sector"
+author: "Joseph Nathan Cohen"
+date: "1/5/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+rm(list=ls())
+gc()
+directory <- "E:/Dropbox/Research/State Balance of Payments"
+setwd(directory)
+
+```
+
+One often hears arguments that high levels of federal redistribution are indicative of a society at risk of major political or economic problems, like economic stagnation, political authoritarianism, or major deteriorations in living standards.  I find most arguments for this belief to be highly-speculative, often very abstract, and routinely plagued by slippery slope reasoning.  Most importantly, the proposition that societies experience worse political or economic outcomes runs contrary to what is indicated by straightforward empirical comparisons.  Always beware policy arguments that ask you to doubt straightforward empirics in favor of complicated, highly conjectural theories.  Empirically, wealthier and better-governed countries generally channel proportionally more of their economic activity through governments.  Consider the following comparisons of government spending, economic production, and governance quality metrics. 
+
+## Data
+
+This analysis examines the relationship between government spending (% GDP), the ratio of government spending to the value of all annual national economic production (GDP).  Countries who score higher on this metric have governments to spend more money and hire more people, relative to the overall amount of economic activity that is occurring in an economy.
+
+I consider two government spending metrics. *Central Government Expenditures (% GDP)* express the ratio of national-level government annual spending to GDP.  These data are drawn from the [World Development Indicators](https://datacatalog.worldbank.org/dataset/world-development-indicators), accessed using the [WDI R package](https://cran.r-project.org/web/packages/WDI/).  These data cover more of the world's countries, but will underestimate government expenditures in political systems with major sub-national governments (e.g., as in the U.S. and Canada).  Our data on *General Government Spending (% GDP)* combines central, state and local government spending, relative to national GDP.  This data comes from the [OECD](https://stats.oecd.org/) and was accessed using the [OECD R package](https://cran.r-project.org/web/packages/OECD/).  It covers a smaller sample of mostly wealthy countries.
+
+```{r fetch data, eval = F, include = F}
+
+#General Government Expenditures from the OECD
+library(OECD)
+sets <- get_datasets()
+subset(sets, grepl("Glance", sets$title) == T)
+oecd <- get_dataset("GOV_2019")
+gexp <- subset(oecd, IND == "GTE_GDP" & obsTime == 2017)[c(1,5)]
+names(gexp) <- paste(c("cname.s", "gexp"))
+
+#Per Capita GDP
+library(WDI)
+library(countrycode)
+
+WDIsearch(string = "GDP per capita")
+gdp.pc <- WDI(country = "all", indicator = "NY.GDP.PCAP.CD",
+              start = 2017, end = 2017)
+gdp.pc$cname.s <- countrycode(gdp.pc$iso2c, "iso2c", "iso3c")
+gdp.pc <- gdp.pc[c(5,3)]
+gdp.pc <- subset(gdp.pc, !is.na(cname.s))
+names(gdp.pc)[2] <- paste("gdp.pc")
+
+#Central Govt Expenditures
+cgexp <- WDI(country = "all", indicator = "GC.XPN.TOTL.GD.ZS",
+             start = 2017, end = 2017)
+cgexp$cname.s <- countrycode(cgexp$iso2c, "iso2c", "iso3c")
+cgexp <- cgexp[c(5,3)]
+cgexp <- subset(cgexp, !is.na(cname.s))
+names(cgexp)[2] <- paste("cgexp")
+
+#Governance Quality
+WDIsearch(string = "Accountability")
+voice <- WDI(country = "all", indicator = "VA.EST",
+              start = 2017, end = 2017)
+voice$cname.s <- countrycode(voice$iso2c, "iso2c", "iso3c")
+voice <- voice[c(5,3)]
+voice <- subset(voice, !is.na(cname.s))
+names(voice)[2] <- paste("voice")
+
+#Rule of Law
+WDIsearch(string = "Rule")
+rlaw <- WDI(country = "all", indicator = "RL.EST",
+              start = 2017, end = 2017)
+rlaw$cname.s <- countrycode(rlaw$iso2c, "iso2c", "iso3c")
+rlaw <- rlaw[c(5,3)]
+rlaw <- subset(rlaw, !is.na(cname.s))
+names(rlaw)[2] <- paste("rlaw")
+
+#Populations
+WDIsearch(string = "Population")
+pop <- WDI(country = "all", indicator = "SP.POP.TOTL",
+              start = 2017, end = 2017)
+pop$cname.s <- countrycode(pop$iso2c, "iso2c", "iso3c")
+pop <- pop[c(5,3)]
+pop <- subset(pop, !is.na(cname.s))
+names(pop)[2] <- paste("pop")
+
+data <- merge(cgexp, gdp.pc, by = "cname.s", all.x = T, all.y = T)
+data <- merge(data, gexp, by = "cname.s", all.x = T, all.y = T)
+data <- merge(data, voice, by = "cname.s", all.x = T, all.y = T)
+data <- merge(data, rlaw, by = "cname.s", all.x = T, all.y = T)
+data <- merge(data, pop, by = "cname.s", all.x = T, all.y = T)
+data$cname <- countrycode(data$cname.s, "iso3c", "country.name")
+
+data <- subset(data, pop > 1000000)
+
+write.csv(data, file = "Government Spending 2017.csv")
+```
+
+```{r load data, include = F}
+data <- read.csv("Government Spending 2017.csv")
+```
+
+Our analysis cover 157 countries with populations of at least one million people.  Data is from 2017.
+
+## Economic Production & Size of Government
+
+First, consider the relationship between government spending and per capita Gross Domestic Product (GDP).  GDP roughly measures estimate the money value of the economic production that takes place in a country.  A country with higher GDP per person are engage in higher value-added production activities, a sign that a society is generally wealthier and commands more purchasing power on global trade markets.  
+
+The figure below presents a scatterplot of central government expenditures (% GDP) and per capita GDP across our sample.
+
+```{r, echo = F, warning =F}
+
+library(ggplot2)
+ggplot(data, aes(x = cgexp, y = log(gdp.pc))) + geom_text(aes(label = cname)) +
+  xlab("Central Government Expenditures (% GDP)") + ylab("Per Capita GDP (logged)")
+#cor(data$cgexp, data$gdp.pc, use = "pairwise.complete.obs")
+```
+
+The pairwise correlation of these metrics is 0.18, suggesting a weak relationship.  The graph can be interpreted as exhibiting no trend.  However, the relationship could be stronger when we consider that the U.S., Canada, and Germany have decentralized government systems that underestimate the overall public sector's size.  That observation, coupled with the temptation to treat Timor, Lesotho, and Afghanistan as outliers, could press us to see a positive relationship if we squint.  But these types of analytical moves are anti-conservative, and a fair and conservative appraisal is that the relationship between government spending and per captia GDP is weakly positive at best.  It certainly isn't negative though -- richer countries clearly do not have smaller governments.
+
+If we use consolidated government expenditures, which include state and local governments, the correlation is roughly the same, and the graph imparts a similar general conclusion.
+
+```{r, echo = F, warning =F}
+
+library(ggplot2)
+ggplot(data, aes(x = gexp, y = log(gdp.pc))) + geom_text(aes(label = cname)) +
+  xlab("General Government Expenditures (% GDP)") + ylab("Per Capita GDP (logged)")
+#cor(data$gexp, data$gdp.pc, use = "pairwise.complete.obs")
+```
+
+The data make it clear that poorer countries do not have bigger governnments.  Many of the countries with relatively larger governments are wealthier.
+
+## Democratic Accountaiblity & Size of Government
+
+Below, we make a similar comparison between countries' government spending and two metrics of governance quality from the [World Bank's World Governance Indidcators](http://info.worldbank.org/governance/wgi/), which can also be accessed through the WDI package.  I consider two indices.  The first is the *Voice and Accountability* metric, which captures countries' general rankings on international expert surveys that assess government system's responsiveness and accountability to popular will.  It is measured on a standardized scale, measured as standard deviations from the mean score (set at zero on this scale).  
+
+```{r, echo = F, warning =F}
+ggplot(data, aes(x = cgexp, y = voice)) + geom_text(aes(label = cname)) +
+  xlab("Central Government Expenditures (% GDP)") + ylab("Voice & Accountability Index")
+#cor(data$cgexp, data$voice, use="pairwise.complete.obs")
+```
+
+Again, when we look at general expenditures, the relationship holds.  If anything more democratic systems have larger public sectors.
+
+```{r, echo = F, warning =F}
+ggplot(data, aes(x = gexp, y = voice)) + geom_text(aes(label = cname)) +
+  xlab("General Government Expenditures (% GDP)") + ylab("Voice & Accountability Index")
+
+```
+
+## Rule of Law & Size of Government
+
+This principle bears out over more development and governance metrics, but we will try one more comparison to establish the basic point that more government does not mean worse government.  This comparison looks at the World Governance Indicators' *Rule of Law* index, which captures the degree to which the law is universally applicable and evenly applied.  Again, the same relationships hold.
+
+```{r, echo = F, warning =F}
+ggplot(data, aes(x = cgexp, y = rlaw)) + geom_text(aes(label = cname)) +
+  xlab("Central Government Expenditures (% GDP)") + ylab("Rule of Law Index")
+```
+
+## Bigger Government & Quality of Government
+
+These relationships exhibit an empirical regularity known to economists as "Wagner's Law" after the 19th century economist, Adoph Wagner, who noted that governments grew proportionally larger to the overall economy as a country grew richer.  Wealthier societies have bigger governments because these economies are more complex and richer societies have the resources to spend to tackle the problems that develop as countries grow richer.  But otherwise, economist have known for over a century that government growth and development go hand-in-hand.  The empirical regularity still seems to hold a century and a half later.
+
+
+
