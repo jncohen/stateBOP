@@ -154,7 +154,6 @@ ggplot(data, aes(x = cgexp, y = rlaw)) + geom_text(aes(label = cname)) +
 
 ## Bigger Government & Quality of Government
 
-These relationships exhibit an empirical regularity known to economists as "Wagner's Law" after the 19th century economist, Adoph Wagner, who noted that governments grew proportionally larger to the overall economy as a country grew richer.  Wealthier societies have bigger governments because these economies are more complex and richer societies have the resources to spend to tackle the problems that develop as countries grow richer.  But otherwise, economist have known for over a century that government growth and development go hand-in-hand.  The empirical regularity still seems to hold a century and a half later.
-
+These relationships exhibit an empirical regularity known to economists as “Wagner’s Law” after the 19th-century economist, Adoph Wagner, to whom the observation that governments and economies grow together is attributed. Wealthier societies have bigger governments because these economies are more complex, with more moving parts to govern.  They are also richer and have the resources to ensure higher living standards for everyone in society. If we are thinking about this issue with a strong empiricism and a leaning towards straightforward explanations, your inclination should be to be credulous about strong theories that government harms freedom and prosperity, unless you want to dwell on extreme and unlikely scenarios.  If your goal is to make the U.S. economic regulation or social policy more like something they do in Northern Europe, don't worry about it.
 
 
