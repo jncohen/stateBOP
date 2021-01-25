@@ -8,7 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 rm(list = ls())
 gc()
-directory <- "E:/Dropbox/Research/State Balance of Payments"
+directory <- "E:/Dropbox/Research/StateBOP"
 setwd(directory)
 
 data <- read.csv("US State Federal Payments 2018.csv") 
