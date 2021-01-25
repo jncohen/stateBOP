@@ -1,0 +1,174 @@
+---
+title: "  State Contributions to Federal Tax Revenues"
+author: "Joseph Nathan Cohen"
+date: "12/14/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+gc()
+directory <- "E:/Dropbox/Research/State Balance of Payments"
+setwd(directory)
+
+data <- read.csv("US State Federal Payments 2018.csv") 
+
+library(readxl)
+library(ggplot2)
+library(usmap)
+library(dplyr)
+library(gridExtra)
+library(kableExtra)
+
+```
+
+
+This analysis explores state-level federal tax payments data that is disaggregated by tax type.  A look at this data provides a more concrete and precise estimate of which communities serve as the economic engines upon which federal government operations depend.  This analysis uses a compiled set of state-level public finance and socioeconomic variables detailed [here](http://www.josephnathancohen.info/data/data-on-us-federal-balance-of-payments-2018/).^[Cohen, Joseph N. 2020. “State Balance of Payment Data, 2018.” Retrieved (<osf.io/eh2d9>).]  The data is from 2018.
+
+## Deconstructing Federal Taxes by Tax Type
+
+Federal taxes are mostly comprised of income taxes.  The largest source is *personal income taxes*, levied on people's new money receipts. This is a progressively redistributive tax, in the sense that richer people pay proportionally more of their incomes.  These yields will be higher in states that house proportionally more very high income households.
+
+The second largest tax source is *payroll taxes* -- the Social Security and Medicare deductions on people's paychecks.  Although these taxes are sometimes considered a form of personal savings or investment in some public retirement fund, the reality of the program is that the services that these taxes fund are financed in the year that they were drawn.  It is a tax on current earners to finance benefits by current recipients, and thus the same kind of taxation for current redistribution as any similar redistribution program.  These taxes are levied on middle class tax payers, as the rate only applied to the first $132,900 in income, and so their burden is proportionally lighter on those who earn more than this amount, and become proportionally lighter as one earns more money.
+
+The third major income tax is *corporate income taxes*.  This rate is flat.  These tax yields will be higher in states where corporations make more money.  Combined these income taxes comprise 90% of federal tax receipts. 
+
+THe remainder of federal revenues come from a variety of sources.  *Excise taxes* are special taxes on goods like motor fuel, airline tickets, tobacco, and other targeted products.  *Estate and gift taxes* are taxes on larger personal transfers, which in 2018 was in excess of $5.6 million.  In 2020, these taxes were on gifts and estates over $11.4 million. *Customs* are taxes on imports.  The remainder is comprised of an assortment of special taxes, fees, and other revenue sources.
+
+Figure 1 (below) presents a pie chart depicting this distribution:
+
+```{r aggregate values, echo = F, warning = F, message = F, fig.height = 8, fig.width = 8, fig.cap="Distribution of Federal Taxes across Tax Type, 2018"}
+
+setwd(paste0(directory,"/Data"))
+agg.data <- data.frame(read_xlsx("OMB-federal-budget-fiscal-year-2020.xlsx", sheet = 4, skip = 3))
+names(agg.data) <- paste(c("year", "ind.inc", "payroll", "corp.inc", "excise", "estate", "customs", "misc", "total"))
+agg.data <- agg.data[1:60,]
+agg.data[1:2,] <- as.numeric(as.character(agg.data[1:2,]))
+
+temp.dat <- agg.data[59,-c(1,9)]
+temp.dat <- as.numeric(temp.dat)/3329.904
+temp.dat <- data.frame(type = c("Personal Income (51%)", "Payroll (35%)", "Corporate Income (6%)", "Excise (3%)", 
+                                "Estate & Gifts (1%)", "Customs (1%)", "Misc. (3%)"),
+                       pct = temp.dat)
+
+
+pie(temp.dat$pct, labels = temp.dat$type)
+rm(list=ls(pattern="temp"))
+
+```
+
+## Where are these Taxes Collected?
+
+Below, our analysis focuses on state-level differences in per capita tax payments by these major federal tax types.  The analysis gives us a refined sense of which communities generate the revenues that sustain government operations.
+
+### Personal Income Taxes
+
+Personal income taxes are progressive,in that wealthier people are supposed to pay higher tax rates and thus give up proportionally more of their income to taxes than poorer people.  For example, an individual earning $30,000 per year would have been expected to pay 12% of their income to federal taxes (before adjustments like deductions, credits, etc.).  Someone earning $150,000 would pay 24%, and those earning above $501,300 paid 35% of their income in federal taxes.  
+
+Of course, wealthy people are known to have the means to reduce their taxes, and we have all seen media stories about super-rich people who pay proportionally less in taxes than poor people.  Despite such stories, America's highest income households appear to be a major source of revenue for the federal government.  According to IRS estimates^[IRS (2020) "Number of Returns, Shares of AGI and Total Income Tax, AGI Floor on Percentiles in Current and Constant Dollars, and Average Tax Rates, 2001 - 2018" Online data set. <https://www.irs.gov/pub/irs-soi/18in01etr.xls>], America's top 0.001% paid about 2.1% of all personal income taxes.  Its top 0.01% paid about 9% of all personal income tax revenues, the top 0.1% paid 20%, and the top 1% paid 40% of these taxes. Federal revenues from personal income taxes are very heavily comprised of payments from very high income households.
+
+The figure below shows per capita personal income tax payments by state.  A table at the end of this post gives precise estimates.  The range of per capita payments is considerable, ranging from \$2,302 per person in Mississippi to \$8,708 in Connecticut.  Oregon was the median state, paying \$4,225 per person in federal taxes on personal incomes.
+
+```{r per income, echo = F, fig.cap = "Per Capita Personal Income Taxes Paid, 2018"}
+
+pinc <- arrange(data[c(2,9)], -tax.paid.pinc.pc)
+
+scatter.metro.pinctax <- 
+  ggplot(data, aes(x = metro.pop.pct, y = tax.paid.pinc.pc)) + geom_text(aes(label = state.abb)) + geom_smooth() +
+  xlab("% Population in Major Metro Area") + ylab("Per Capita Personal Income Taxes Paid")
+scatter.gdppc.pinctax <- 
+  ggplot(data, aes(x = gdp.pc, y = tax.paid.pinc.pc)) + geom_text(aes(label = state.abb)) + geom_smooth() +
+  xlab("Per Capita Gross State Product") + ylab("Per Capita Personal Income Taxes Paid")
+
+plot_usmap(data = data, values = "tax.paid.pinc.pc", color = "black") + 
+  scale_fill_continuous(low = "red", high = "green", 
+                        name = "Taxes Per Capita", 
+                        label = scales::comma) + 
+  theme(legend.position = "right")
+
+```
+
+Per capita personal income taxes are higher in states whose populations include more high-income earners.  Personal taxes are highest in states whose populations are dominated by residents of the country's high-income and high value-added major metropolitan areas: New York, Boston, Los Angeles, San Francisco, Philadelphia, Chicago, and the District of Columbia regions.  Wyomng and South Dakota are outliers among the states that remit large personal taxes on a per capita basis, in that they are not connected to such "mega-cities".  It may be that these states high aggregate payments reflect these states' very small populations and their success in attracting wealthy residents.  Jackson Hole is reputed to be a venue for vacation property ownership among the very wealthy.  South Dakota established niche industries in the financial sector.  Their small populations could make these cases similar to those of, say, Barbados or the Cayman Islands when examining international differences in macro-finance metrics.
+
+```{r, echo = F, warning = F, message = F, fig.width = 8, fig.height=3, fig.cap = "Per Capita Production & Metro Population's Relationship with Personal Income Taxes Per Capita"}
+
+grid.arrange(scatter.gdppc.pinctax, scatter.metro.pinctax, ncol = 2)
+
+```
+
+### Payroll Taxes
+
+*Payroll taxes* are mainly comprised of people's Social Security and Medicare payroll deductions.  Unlike personal income taxes, payroll taxes fall most heavily on the upper-middle class, while their impact on very high income households is more limited.  In 2018, these taxes were due on the first \$128,400 of wages. As such, a person earning \$1 million and someone earning \$150,000 would pay the same amount in payroll taxes.  The rate was the same for all those earning below \$128,400
+
+```{r payroll tax, echo = F, fig.cap = "Per Capita Social Insurance Taxes Paid, 2018"}
+
+payroll <- arrange(data[c(2,11)], -tax.paid.socins.pc)
+
+scatter.medinc.payroll <- 
+  ggplot(data, aes(x = med.income, y = tax.paid.socins.pc)) + geom_text(aes(label = state.abb)) + geom_smooth() +
+  xlab("Median State Income") + ylab("Per Capita Personal Income Taxes Paid")
+scatter.pov.payroll <- 
+  ggplot(data, aes(x = pov.pct, y = tax.paid.socins.pc)) + geom_text(aes(label = state.abb)) + geom_smooth() +
+  xlab("Poverty Rate") + ylab("Per Capita Personal Income Taxes Paid")
+
+plot_usmap(data = data, values = "tax.paid.socins.pc", color = "black") + 
+  scale_fill_continuous(low = "red", high = "green", 
+                        name = "Taxes Per Capita", 
+                        label = scales::comma) + 
+  theme(legend.position = "right")
+
+```
+
+States tend to pay more of these taxes on a per capita basis when their wage-earning population is generally earning more.  The figure below demonstrates how per capita payroll tax receipts are higher in states with higher median incomes and lower poverty rates.  
+
+```{r, echo = F, warning = F, message = F, fig.width = 8, fig.height=3, fig.cap = "Per Capita Production & Metro Population's Relationship with Personal Income Taxes Per Capita"}
+
+grid.arrange(scatter.medinc.payroll , scatter.pov.payroll, ncol = 2)
+
+```
+
+It is also worth noting that population concentration in major metro areas and payroll taxes are also higher, because wages are generally higher in highly-productive and -profitable metro regions.
+
+```{r, echo = F}
+  ggplot(data, aes(x = metro.pop.pct, y = tax.paid.socins.pc)) + geom_text(aes(label = state.abb)) + geom_smooth() +
+  xlab("Poverty Rate") + ylab("Per Capita Personal Income Taxes Paid")
+```
+
+
+### Corporate Income Taxes
+
+Per capita corporate income taxes are the total income taxes levied on a state's corporation's income, divided by the total population.  The figure gives the reader a sense of how the business activity generated by a state also sustains federal government finances.  Tax hauls seen to be higher in states where higher personal incomes prevail.  Ultimately, there are a set of states who are experiencing high production or profit, which creates both high income people and enterprises.
+
+```{r corptax, echo = F, fig.cap = "Corporate Taxes per Capita"}
+plot_usmap(data = data, values = "tax.paid.corp.pc", color = "black") + 
+  scale_fill_continuous(low = "red", high = "green", 
+                        name = "Taxes Per Capita", 
+                        label = scales::comma) + 
+  theme(legend.position = "right")
+
+corp <- arrange(data[c(2,13)], -tax.paid.corp.pc)
+
+```
+
+## Lessons
+
+The federal government's finances are primarily sustained by tax levies on the personal incomes of higher income households, and secondarily by taxes on the incomes of wage earners and corporations.  All three tend to prevail in states whose populations are concentrated in "rich states" that house the country's major metropolitan economic powerhouses.
+
+Insofar as taxation levels across states are concerned, US federal government finances looks quite progressive, in that it redistributes money away from communities with high earners and profitable businesses to communities with low wages, less business activity, and less attraction to the wealthy.  The benefits of this redistribution to those who live in communities sidelined by the rich and big businesses is obvious -- it allows their communities to finance federal services that are better funded than what local taxes could afford on their own.  It is progressive in the sense that it takes money from economically dynamic communities to those where such dynamism is in shorter supply.
+
+However, what about the poor who live in these wealthy regions.  Are their interests necessarily ensured by this redistribution.  It depends on whether the money that is drawn from their community is spent on federal services that benefit the typical, run-of-the-mill family living in metro New York, Los Angeles, Boston, or so on.  
+
+## Appendix
+
+```{r, echo = F}
+
+tab <- data.frame(pinc, payroll, corp)
+tab[2] <- round(tab[2], 0)
+tab[4] <- round(tab[2], 0)
+tab[6] <- round(tab[2], 0)
+kable(tab,
+      col.names = c("State", "Mean Personal Income", "State", "Mean Payroll", "State", "Mean Corporate"),
+      caption = "Appendix A-1: Per Capita Taxes by State, 2018")
+
+
+```

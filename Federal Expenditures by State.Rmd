@@ -1,0 +1,96 @@
+---
+title: "Federal Expenditures by State: The Poverty Premium and Population Penalty"
+author: "Joseph Nathan Cohen"
+date: "12/17/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+gc()
+directory <- "E:/Dropbox/Research/State Balance of Payments"
+setwd(directory)
+
+data <- read.csv("US State Federal Payments 2018.csv") 
+
+options(scipen=999)
+
+library(usmap)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(scales)
+library(kableExtra)
+library(sjPlot)
+library(sjmisc)
+library(sjlabelled)
+library(GGally)
+library(lmtest)
+library(usdm)
+library(car)
+library(stargazer)
+
+```
+
+This analysis examines the distribution of federal spending by state, both overall and by major expenditure category.  SUMMARIZE FINDINGS.
+
+## Distribution of Total Expenditures
+
+We begin with a look at the distribution of total expenditures by state.  The distribution of expenditures is far more equal than that of [federal revenues](http://www.josephnathancohen.info/notes/state-contributions-to-federal-tax-revenues/).  Particularly states with particularly high expenditures enjoy roughly double the 
+
+Five states receive particularly high levels of federal transfers.  Foremost among them are the states of the national capital region -- Virginia (\$18,678 per person) and Maryland (\$18,505) -- which receive a disproportionate share of federal spending.  Spending is also particularly high in the two non-continguous states: Alaska(\$18,046) and Hawaii (\$15,213). Finally, New Mexico (\$16,852) appears to enjoy particularly high spending.  The remainder of the states receives between \$7,800 (Utah) and \$15,012 (Vermont) per person.
+
+Figure 1 (below) presents a map depicting this distribution, minus these extraordinary four states.  A full table with precise estimates is appended to this report.
+
+```{r, echo = F, fig.cap = "Per Capita Federal Expenditures by State, 2018. National capital region and non-continugous states excluded"}
+
+data.nocap <- data %>% 
+  filter(state.abb != "MD" & state.abb!="VA" & state.abb!="HI" & state.abb!="AK")
+
+plot_usmap(data = data.nocap, 
+           values = "exp.pc", color = "black") + 
+  scale_fill_continuous(low = "white", high = "blue", 
+                        name = "Expenditures Per Capita", 
+                        label = scales::comma) + 
+  theme(legend.position = "right")
+
+tot.exp <- arrange(data[c(2,19)], -exp.pc)
+
+#((12787-10304)*8908520)/1000000000
+
+```
+
+Although per capita expenditures seem more equitable in comparison to the wild variance in [federal revenues](http://www.josephnathancohen.info/notes/state-contributions-to-federal-tax-revenues/), these differences in per capita spending amount to a lot of money in the aggregate.  A thousand dollar difference in per capita spending is not chump change.  Were New Jersey (\$10,304 per capita expenditures received) to receive the same spending levels as Missouri (\$12,787), more than $22 billion in additional spending would be infused to its economy annually.  Such spending amounts to an additional 3.6% of gross state product annually.
+
+My exploration of the data suggests that the most powerful and parsimonious explanation of inter-state differences in federal spending is presented below in Table 1.  Diagnostics suggest that, in addition to the capital region states (MD and VA), Utah and Alaska are also outliers.  Alaska has very high spending relative to what the modle would predict, and Utah is an outlier for low federal expenditures.
+
+```{r, include = F}
+
+data$med.income.K <- data$med.income / 1000
+data$population.M <- data$population/1000000
+
+temp.dat <- subset(data, state.abb != "VA" & state.abb!="MD" & state.abb != "UT" & state.abb != "AK")
+model.1 <- lm(exp.pc ~ log(population) +  pov.pct, data = temp.dat)
+summary(model.1)
+
+plot(model.1)
+bptest(model.1)
+leveragePlots(model.1)
+
+```
+
+```{r, echo = F, results = 'asis'}
+stargazer(model.1, type = "html")
+```
+
+This model suggests that, at a baseline, states receive \$19,145 per person, assuming zero population and zero poor.  Moreover, it suggests that states receive an extra \$245 per person for each addition percentage point of population living below the poverty line.  This *poverty premium* amounts to an additional \$1,862 for New Hampshire at 7.6%, the state with the lowest rate.  In Mississippi, which lead the nation at 19.8%, the poverty premium to federal spending amounted to an additional \$4,851.
+
+The model also predicts a *population penalty* to government spending that amounts to about \$7 per person for each additional percent higher population^[$-695 * log(1.01) = \$6.92$].  So, for example, in 2018, New York State' had 's a population of 19,542,209 was 547% that of Connecticut's population of 3,572,665. The population penalty levied against New York State is \$11,675 per person, compared to \$10,493 in Connecticut.  New York's larger population results in an additional spending penalty of \$1,182 per person.^[Equal to $-695 * log(5.47)$].  In other words, our analysis shows that federal spending is systematically lower in larger states.  
+
+This penalty amounts to considerable stimulus for small states.  The predicted difference in federal expenditures between Wyoming (558 thousand people) and California (40 million people) amounts to a 6800% population difference, and a predicted spending difference of \$2,937 less spending per person ^[$-695 * log(68.5)$].  The federal government's penchant to prefer small states provides these states with a considerable economic boost.  Were California to receive Wyoming's small state funding advantage, California would be receiving on the order of \$116 billion in additional spending to the California economy annually.
+
+## The Poverty Premium and Population Penalty
+
+This analysis of federal expenditures suggest that the distribution of federal spending across states is influenced by at least two important factors: population size and the prevalence of poverty.  This vantage point offers us more insight as to why federal policies shift money away from the union's [donor states](http://www.josephnathancohen.info/notes/federal-redistribution-between-u-s-states-2018/).  Analysts and commentators routinely point to taxes as a source of these balance of payment deficits, and [the comparatively wide variation in tax remittances](http://www.josephnathancohen.info/notes/state-contributions-to-federal-tax-revenues/) suggests that it is the biggest factor.  However, unequal spending is also a factor.  The union's mor donor states -- California, New York, New Jersey, Massachusetts, Illinois, and Minnesota -- have comparatively low poverty rates and larger populations.
+
+This "population penalty" in spending suggests that the unequal distribution of power in the federal government that favors small states is being leveraged to provide surplus economic transfers to small states.  Metropolitan New York has around 21 million people, and is represented by six Senators and a few dozen House members.  The union's 16 lowest popluation states^[Wyoming, Vermont, Alaska, North Dakota, South Dakota, Delawere, Rhode Island, Montana, Maine, New Hampshire, Hawaii, Idaho, West virginia, Nebraska, New Mexico, and Kansas] also amount to about 21 million people, but are represented by 32 Senators and many more Representatives.  This structural disavantage in power over federal government decisions is translated into economic transfers.

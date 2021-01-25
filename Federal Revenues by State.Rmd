@@ -1,0 +1,139 @@
+---
+title: "State Contributions to Federal Tax Revenue"
+author: "Joseph Nathan Cohen"
+date: "12/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+gc()
+directory <- "E:/Dropbox/Research/State Balance of Payments"
+setwd(directory)
+
+data <- read.csv("US State Federal Payments 2018.csv") 
+
+
+library(usmap)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(scales)
+library(kableExtra)
+library(sjPlot)
+library(sjmisc)
+library(sjlabelled)
+library(GGally)
+```
+
+This analysis examines the distribution of federal tax payments by state.  It uses a compiled set of state-level public finance and socioeconomic variables detailed [here](http://www.josephnathancohen.info/data/data-on-us-federal-balance-of-payments-2018/).^[Cohen, Joseph N. 2020. “State Balance of Payment Data, 2018.” Retrieved (<osf.io/eh2d9>).]  Our data is from 2018.
+
+## Distribution of Federal Tax Payments
+
+### Total Contributions
+
+The map below depicts state contributions to *total tax revenues*, the total amount of money transmitted from people and enterprises in that state to the federal government.  See Table A-1 at the end of this post for precise estimates.
+
+```{r tot tax figure, echo = F, fig.width=8, fig.height=6, fig.cap = "Figure 1: Total Federal Taxes Paid, by State, 2018"}
+data$tax.paid.total.B <- data$tax.paid.total / 1000
+plot_usmap(data = data, values = "tax.paid.total.B", labels = T)+
+  labs(fill = 'Total Federal Taxes (billions)') + 
+  scale_fill_gradient( low = "white", high = "blue",
+                       na.value="grey90",
+                       guide = guide_colourbar(barwidth = 25, barheight = 0.4,
+                                               title.position = "top")) +
+   theme(legend.position = "bottom",
+        legend.title=element_text(size=10), 
+        legend.text=element_text(size=8),
+        title = element_text(size = 14)) +
+  labs(caption = "Joseph N. Cohen, 2020")
+```
+
+```{r lm state tot on pop and wealth, include = F}
+
+ggplot(data, aes(x = log(population), y = log(tax.paid.total))) + geom_point()
+ggplot(data, aes(x = log(gdp.pc), y = log(tax.paid.total))) + geom_point()
+
+model.1 <- lm(log(tax.paid.total) ~ log(population) + log(gdp.pc), data = data)
+summary(model.1)
+# Note R^2 = 0.99
+
+
+```
+
+States' total contribution to the U.S. federal government budget is almost perfectly predicted by their population and general income levels.  In and of itself, this observation seems unremarkable.  However, the map does speak to the federal government's financial dependency on large state contributions.  Half of all federal receipts are generated in eight states - California, Texas, New York, Florida, Illinois, Pennsylvania, New Jersey, and Massachusetts. By contrast, the 25 states who remit smaller aggregate contributions to the federal government generate about 15% of revenues.  Although the architecture of the federal government privileges small states in political affairs, federal government financing is highly dependent on the resources provided to it by large states.  Large states are important to the Union because they contain most of the people and generate most of the wealth.  A policy environment that does damage to large states is one that damages the economic engine of the federal union.
+
+```{r calc top 10 state agg tax, include = F}
+
+temp <- arrange(data[c(2,6)], -tax.paid.total)
+sum(temp[c(1:10),2])/sum(temp[,2])
+sum(temp[c(25:50),2])/sum(temp[,2])
+sum(temp[c(25:50),2])/sum(temp[,2])
+
+```
+
+### Per Capita Taxes
+
+*Per capita tax revenues* depicts the average tax bill paid by people in a given state.  Figure 2 (below) depicts the distribution of per capita federal taxes by state.  This metric is calculated by dividing total tax revenues by the state's population. More precise estimates presented below on Table A-1.
+
+```{r, echo = F, fig.width=8, fig.height=6, fig.cap = "Figure 2: Per Capita Federal Taxes Paid, by State, 2018"}
+
+plot_usmap(data = data, values = "tax.paid.pc", labels = T)+
+  labs(fill = 'Federal Taxes Per Capita') + 
+  scale_fill_gradient( low = "white", high = "blue",
+                       na.value="grey90",
+                       guide = guide_colourbar(barwidth = 25, barheight = 0.4,
+                                               title.position = "top")) +
+   theme(legend.position = "bottom",
+        legend.title=element_text(size=10), 
+        legend.text=element_text(size=8),
+        title = element_text(size = 14)) +
+  labs(caption = "Joseph N. Cohen, 2020")
+  
+```
+
+The figure shows that per capita tax payments are higher in the Northeast and West Coast than other states.  What explains these per capita tax differentials?  The models depicted below in Table 2 suggest that these differences are largely a product of differences in state incomes.  
+
+```{r, echo = F}
+
+model.2 <- lm(log(tax.paid.pc) ~ log(gdp.pc) + log(med.income), data = data)
+tab_model(model.2)
+
+```
+
+The model predicts that a 10% increase in per capita GDP will result in roughly 8.4% higher per capita tax payments (a very close association, which drives this model's impressive R-squared).  A similar rise in median incomes are predicted to result in a roughly 3% rise in per capita taxes.
+
+What explains these findings?  Per capita GDP is an average, which are influenced by outlying values.  Median incomes are resistant to the influence of outliers.  I interpret these findings to suggest that higher per capita tax payments are mostly a product of taxation on particularly high-earning households and businesses, rather than a situation in which taxes are higher because the typical person is richer. 
+
+```{r, echo = F, fig.cap = "Figure 3: Correlates of High Incomes"}
+temp <- data[c(7,78,83,85,86)]
+ggpairs(temp)
+```
+
+Overall, this look at the data suggests that federal tax differentials are mainly driven by the distribution of high-income households and businesses.  Federal tax receipts are higher in places that house rich people.  They are also higher when the typical person enjoys a higher incomes. Both average and median incomes are related to less poverty as well, but higher living costs.
+
+# Appendix
+
+```{r, eval = T, echo = F, fig.width=8, fig.height=6}
+
+# Generate Table of State-Level Revenues
+# Note DC Excluded
+
+data$gdp.pc <- data$gdp.pc * 1000
+
+temp.1 <- arrange(data[c(2,6)], -data$tax.paid.total)
+temp.1[2] <- comma(as.numeric(as.character(unlist(temp.1[2]))), largest_with_cents=0)
+temp.2 <- arrange(data[c(2,7)], -data$tax.paid.pc)
+temp.2[2] <- comma(as.numeric(as.character(unlist(temp.2[2]))), largest_with_cents=0)
+temp.3 <- arrange(data[c(2,78)], -data$gdp.pc)
+temp.3[2] <- comma(as.numeric(as.character(unlist(temp.3[2]))), largest_with_cents=0)
+temp.4 <- arrange(data[c(2,86)], -med.income)
+temp.4[2] <- comma(as.numeric(as.character(unlist(temp.4[2]))), largest_with_cents=0)
+tab.rev.tot <- data.frame(cbind(temp.1, temp.2, temp.3, temp.4))
+rm(list=ls(pattern  = "temp"))
+kable(tab.rev.tot,
+      col.names = c("State", "Total Taxes", "State", "Per Capita Taxes", "State", "Per Capita GDP", "State", "Median Income"),
+      caption = "Appendix A-1: Taxes by State, 2018")
+
+
+```
